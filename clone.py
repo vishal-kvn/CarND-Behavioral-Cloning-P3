@@ -19,8 +19,8 @@ for line in lines:
     filename = source_path.split('/')[-1]
     # current_path = '../data/IMG/' + filename
     current_path = '/opt/data/IMG/' + filename
-    # image = cv2.imread(current_path)
-    image = ndimage.imread(current_path)
+    image = cv2.imread(current_path)
+    #image = ndimage.imread(current_path)
     images.append(image)
     measurement = float(line[3])
     measurements.append(measurement)
