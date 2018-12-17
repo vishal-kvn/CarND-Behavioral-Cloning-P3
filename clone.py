@@ -48,6 +48,8 @@ from keras.layers.core import Dense, Activation, Flatten, Dropout, Lambda
 from keras.layers import Cropping2D
 from keras.layers import Conv2D
 from keras.layers import MaxPooling2D
+from keras.layers.convolutional import Convolution2D
+
 
 """
 model = Sequential()
@@ -62,6 +64,7 @@ model.fit(X_train, y_train, validation_split=0.2, shuffle=True, epochs=7)
 model.save('model.h5')
 """
 
+"""
 # LeNet architecture
 model = Sequential()
 model.add(Lambda(lambda x: x/255.0 -0.5, input_shape=(160, 320, 3)))
@@ -96,6 +99,26 @@ model.add(Dense(units = 84))
 #Layer 5
 #Output Layer
 model.add(Dense(units = 1))
+
+model.compile(loss='mse', optimizer='adam')
+model.fit(X_train, y_train, validation_split=0.2, shuffle=True, epochs=5)
+
+model.save('model.h5')
+"""
+# NVIDIA Architecture
+model = Sequential()
+model.add(Lambda(lambda x: x/255.0 - 0.5, input_shape=(160, 320, 3)))
+model.add(Cropping2D(cropping=((70, 25), (0, 0))))
+model.add(Conv2D(filters = 24, kernel_size = 5, strides=2, activation="relu"))
+model.add(Conv2D(filters = 36, kernel_size = 5, strides=2, activation="relu"))
+model.add(Conv2D(filters = 48, kernel_size = 5, strides=2, activation="relu"))
+model.add(Conv2D(filters = 64, kernel_size = 3, strides=1, activation="relu"))
+model.add(Conv2D(filters = 64, kernel_size = 3, strides=1, activation="relu"))
+model.add(Flatten())
+model.add(Dense(100))
+model.add(Dense(50))
+model.add(Dense(10))
+model.add(Dense(1))
 
 model.compile(loss='mse', optimizer='adam')
 model.fit(X_train, y_train, validation_split=0.2, shuffle=True, epochs=5)
