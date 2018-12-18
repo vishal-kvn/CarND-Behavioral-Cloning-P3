@@ -4,107 +4,68 @@ import numpy as np
 from keras.models import Sequential
 from keras.layers.core import Dense, Activation, Flatten, Dropout
 from scipy import ndimage
+import sklearn
+import matplotlib.pyplot as plt
 
-lines = []
+samples = []
 with open('/opt/data/driving_log.csv') as csvfile:
     reader = csv.reader(csvfile)
     for line in reader:
-        lines.append(line)
+        samples.append(line)
 
-images = []
-measurements = []
+from sklearn.model_selection import train_test_split
+train_samples, validation_samples = train_test_split(samples, test_size=0.2)
+        
+def generator(samples, batch_size=32):
+    num_samples = len(samples)
+    while 1:
+        sklearn.utils.shuffle(samples)
+        for offset in range(0, num_samples, batch_size):
+            batch_samples = samples[offset:offset+batch_size]
+            
+            images = []
+            measurements = []
+            # use center, left, right images with correction
+            for batch_sample in batch_samples:
+                steering_center = float(batch_sample[3])
+                correction = 0.2
+                steering_left = steering_center + correction
+                steering_right = steering_center - correction
+                
+                for i in range(3):
+                    source_path = batch_sample[i]
+                    filename = source_path.split('/')[-1]
+                    current_path = '/opt/data/IMG/' + filename
+                    image = cv2.imread(current_path)
+                    images.append(image)
 
-for line in lines:
-    steering_center = float(line[3])
-    correction = 0.2
-    steering_left = steering_center + correction
-    steering_right = steering_center - correction
-    
-    for i in range(3):
-        source_path = line[i]
-        filename = source_path.split('/')[-1]
-        # current_path = '../data/IMG/' + filename
-        current_path = '/opt/data/IMG/' + filename
-        image = cv2.imread(current_path)
-        #image = ndimage.imread(current_path)
-        images.append(image)
-     
-    measurements.append(steering_center)
-    measurements.append(steering_left)
-    measurements.append(steering_right)
+                measurements.append(steering_center)
+                measurements.append(steering_left)
+                measurements.append(steering_right)
 
-augmented_images, augmented_measurements = [], []
-for image, measurement in zip(images, measurements):
-    augmented_images.append(image)
-    augmented_measurements.append(measurement)
-    augmented_images.append(cv2.flip(image, 1))
-    augmented_measurements.append(measurement*-1.0)
+            augmented_images, augmented_measurements = [], []
+            for image, measurement in zip(images, measurements):
+                augmented_images.append(image)
+                augmented_measurements.append(measurement)
+                augmented_images.append(cv2.flip(image, 1))
+                augmented_measurements.append(measurement*-1.0)
+                
+            X_train = np.array(augmented_images)
+            Y_train = np.array(augmented_measurements)
+            yield sklearn.utils.shuffle(X_train, Y_train)
 
-X_train = np.array(augmented_images)
-y_train = np.array(augmented_measurements)
+# compile and train model using generator function
+train_generator= generator(train_samples, batch_size=32)
+validation_generator = generator(validation_samples, batch_size=32)
 
 from keras.models import Sequential
+from keras.models import load_model
 from keras.layers.core import Dense, Activation, Flatten, Dropout, Lambda
 from keras.layers import Cropping2D
 from keras.layers import Conv2D
 from keras.layers import MaxPooling2D
 from keras.layers.convolutional import Convolution2D
 
-
-"""
-model = Sequential()
-# Basic architecture
-model.add(Lambda(lambda x: x/255.0 -0.5, input_shape=(160, 320, 3)))
-model.add(Flatten())
-model.add(Dense(1))
-
-model.compile(loss='mse', optimizer='adam')
-model.fit(X_train, y_train, validation_split=0.2, shuffle=True, epochs=7)
-
-model.save('model.h5')
-"""
-
-"""
-# LeNet architecture
-model = Sequential()
-model.add(Lambda(lambda x: x/255.0 -0.5, input_shape=(160, 320, 3)))
-model.add(Cropping2D(cropping=((70,20), (0,0)), input_shape=(3,160,320)))
-
-#Layer 1
-#Conv Layer 1
-model.add(Conv2D(filters = 6, 
-                 kernel_size = 5, 
-                 strides = 1, 
-                 activation = 'relu', 
-                 input_shape = (70,320,3)))
-#Pooling layer 1
-model.add(MaxPooling2D(pool_size = 2, strides = 2))
-#Layer 2
-#Conv Layer 2
-model.add(Conv2D(filters = 16, 
-                 kernel_size = 5,
-                 strides = 1,
-                 activation = 'relu',
-                 input_shape = (14,14,6)))
-#Pooling Layer 2
-model.add(MaxPooling2D(pool_size = 2, strides = 2))
-#Flatten
-model.add(Flatten())
-#Layer 3
-#Fully connected layer 1
-model.add(Dense(units = 120))
-#Layer 4
-#Fully connected layer 2
-model.add(Dense(units = 84))
-#Layer 5
-#Output Layer
-model.add(Dense(units = 1))
-
-model.compile(loss='mse', optimizer='adam')
-model.fit(X_train, y_train, validation_split=0.2, shuffle=True, epochs=5)
-
-model.save('model.h5')
-"""
 # NVIDIA Architecture
 model = Sequential()
 model.add(Lambda(lambda x: x/255.0 - 0.5, input_shape=(160, 320, 3)))
@@ -120,7 +81,27 @@ model.add(Dense(50))
 model.add(Dense(10))
 model.add(Dense(1))
 
+print(model.summary())
+
 model.compile(loss='mse', optimizer='adam')
-model.fit(X_train, y_train, validation_split=0.2, shuffle=True, epochs=5)
+
+#model.fit(X_train, y_train, validation_split=0.2, shuffle=True, epochs=5)
+history_object = model.fit_generator(
+            train_generator, samples_per_epoch = len(train_samples),
+            validation_data=validation_generator,  nb_val_samples=len(validation_samples),
+            nb_epoch=5, verbose = 1)
 
 model.save('model.h5')
+
+
+### print the keys contained in the history object
+print(history_object.history.keys())
+
+### plot the training and validation loss for each epoch
+plt.plot(history_object.history['loss'])
+plt.plot(history_object.history['val_loss'])
+plt.title('model mean squared error loss')
+plt.ylabel('mean squared error loss')
+plt.xlabel('epoch')
+plt.legend(['training set', 'validation set'], loc='upper right')
+plt.show()
