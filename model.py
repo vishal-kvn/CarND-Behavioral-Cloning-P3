@@ -87,17 +87,16 @@ model.compile(loss='mse', optimizer='adam')
 
 
 #model.fit(X_train, y_train, validation_split=0.2, shuffle=True, epochs=5)
-history_object = model.fit_generator(
-            train_generator, samples_per_epoch = len(train_samples),
-            validation_data=validation_generator,  nb_val_samples=len(validation_samples),
-            nb_epoch=2, verbose = 1)
+history_object = model.fit_generator(train_generator, samples_per_epoch = len(train_samples), validation_data=validation_generator,  nb_val_samples=len(validation_samples), nb_epoch=3, verbose = 1)
 
 model.save('model.h5')
 
-"""
 ### print the keys contained in the history object
 print(history_object.history.keys())
+print(history_object.history['loss'])
+print(history_object.history['val_loss'])
 
+"""
 ### plot the training and validation loss for each epoch
 plt.plot(history_object.history['loss'])
 plt.plot(history_object.history['val_loss'])
